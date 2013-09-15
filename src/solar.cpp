@@ -23,6 +23,9 @@
 #include <GL/glut.h>
 #endif
 
+#define PI 3.1415926535
+
+GLfloat vWhite[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 GLShaderManager     shaderManager;          // Stock Shader Manager
 
@@ -52,6 +55,17 @@ GLTriangleBatch     uranusRingBatch;
 GLTriangleBatch     neptuneBatch;
 GLTriangleBatch     plutoBatch;
 
+GLBatch             mercuryOrbitBatch;
+GLBatch             venusOrbitBatch;
+GLBatch             earthOrbitBatch;
+GLBatch             moonOrbitBatch;
+GLBatch             marsOrbitBatch;
+GLBatch             jupiterOrbitBatch;
+GLBatch             saturnOrbitBatch;
+GLBatch             uranusOrbitBatch;
+GLBatch             neptuneOrbitBatch;
+GLBatch             plutoOrbitBatch;
+
 GLTriangleBatch     emptyRingBatch;
 
 GLFrame             cameraFrame;
@@ -62,12 +76,15 @@ M3DMatrix44f        mCamera;
 GLuint              uiTextures[12];
 GLuint              skyBoxTexture[6];
 
-GLuint  solarShader;         // The Solar shader
-GLint   locColor;           // The location of the diffuse color
+GLuint  solarShader;        // The Solar shader
 GLint   locLight;           // The location of the Light in eye coordinates
-GLint   locMVP;             // The location of the ModelViewProjection matrix uniform
 GLint   locMV;              // The location of the ModelView matrix uniform
+GLint   locMVP;             // The location of the ModelViewProjection matrix uniform
 GLint   locNM;              // The location of the Normal matrix uniform
+
+GLuint  simpleShader;       // The Solar shader
+GLint   locSimpleColor;     // The location of the diffuse color
+GLint   locSimpleMVP;       // The location of the ModelViewProjection matrix uniform
 
 const float mercuryOrbitInclination = 7.0f;
 const float mercuryAxialTilt = -0.027f;
@@ -130,6 +147,8 @@ void gltMakeSkyboxLeft(GLBatch& cubeBatch, GLfloat fRadius );
 void gltMakeSkyboxRight(GLBatch& cubeBatch, GLfloat fRadius );
 void gltMakeSkyboxFront(GLBatch& cubeBatch, GLfloat fRadius );
 void gltMakeSkyboxBack(GLBatch& cubeBatch, GLfloat fRadius );
+
+void gltMakeCircle(GLBatch& circleBatch, GLfloat fRadius, int points );
     
 bool LoadTGATexture(const char *szFileName, GLenum minFilter, GLenum magFilter, GLenum wrapMode)
 {
@@ -195,6 +214,17 @@ void SetupRC()
     gltMakeDisk(uranusRingBatch, uranusRingInnerRadius, uranusRingOuterRadius, 30, 15);
     gltMakeSphere(neptuneBatch, neptuneRadius, 30, 15);
     gltMakeSphere(plutoBatch, plutoRadius, 16, 8);
+
+    gltMakeCircle(mercuryOrbitBatch, mercuryOrbitRadius, 50);
+    gltMakeCircle(venusOrbitBatch, venusOrbitRadius, 50);
+    gltMakeCircle(earthOrbitBatch, earthOrbitRadius, 50);
+    gltMakeCircle(moonOrbitBatch, moonOrbitRadius, 50);
+    gltMakeCircle(marsOrbitBatch, marsOrbitRadius, 50);
+    gltMakeCircle(jupiterOrbitBatch, jupiterOrbitRadius, 50);
+    gltMakeCircle(saturnOrbitBatch, saturnOrbitRadius, 50);
+    gltMakeCircle(uranusOrbitBatch, uranusOrbitRadius, 50);
+    gltMakeCircle(neptuneOrbitBatch, neptuneOrbitRadius, 50);
+    gltMakeCircle(plutoOrbitBatch, plutoOrbitRadius, 50);
         
     // Make 3 texture objects
     glGenTextures(12, uiTextures);
@@ -263,6 +293,12 @@ void SetupRC()
     locMVP = glGetUniformLocation(solarShader, "mvpMatrix");
     locMV  = glGetUniformLocation(solarShader, "mvMatrix");
     locNM  = glGetUniformLocation(solarShader, "normalMatrix");
+
+
+    simpleShader = gltLoadShaderPairWithAttributes("src/SimpleShader.vp", "src/SimpleShader.fp", 1, GLT_ATTRIBUTE_VERTEX, "vVertex");
+
+    locSimpleColor = glGetUniformLocation(simpleShader, "vColor");
+    locSimpleMVP = glGetUniformLocation(simpleShader, "mvpMatrix");
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -291,6 +327,8 @@ void ChangeSize(int nWidth, int nHeight)
 bool fullScreen = false;
 bool speedBoost = false;
 bool stop = false;
+bool orbitsVisible = false;
+bool timeStop = false;
 
 void KeyDown(unsigned char key, int x, int y)
 {
@@ -307,8 +345,14 @@ void KeyDown(unsigned char key, int x, int y)
     else if(key == 32){
         speedBoost = true;
     }
-    else if(key == 's'){
+    else if(key == 'c'){
         stop = true;
+    }
+    else if(key == 'v'){
+        orbitsVisible = true;
+    }
+    else if(key == 's'){
+        timeStop = true;
     }
     else if(key == 27){
         exit(0);
@@ -320,8 +364,14 @@ void KeyUp(unsigned char key, int x, int y)
     if(key == 32){
         speedBoost = false;
     }
-    else if(key == 's'){
+    else if(key == 'c'){
         stop = false;
+    }
+    else if(key == 'v'){
+        orbitsVisible = false;
+    }
+    else if(key == 's'){
+        timeStop = false;
     }
 }
 
@@ -401,14 +451,21 @@ void MoveForward(float distance)
 
 }
 
-void RenderPlanet(GLTriangleBatch &planetBatch, float inclination, float orbitAngularPosition, float orbitRadius,
+void RenderPlanet(GLTriangleBatch &planetBatch, GLBatch &planetOrbitBatch, float inclination, float orbitAngularPosition, float orbitRadius,
                     float axialTilt, float rotation, GLuint texture, GLfloat* color,
                     GLTriangleBatch* planetRingBatch = &emptyRingBatch, GLuint ringTexture = -1)
 {
     modelViewMatrix.PushMatrix();
+        
+        modelViewMatrix.Rotate(inclination, 0.0f, 0.0f, 1.0f);
+        if(orbitsVisible){
+            glUseProgram(simpleShader);
+            glUniform4fv(locSimpleColor, 1, vWhite);
+            glUniformMatrix4fv(locSimpleMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
+            planetOrbitBatch.Draw();
+        }
 
         modelViewMatrix.Rotate(90.0, 1.0f, 0.0f, 0.0f);
-        modelViewMatrix.Rotate(inclination, 0.0f, 1.0f, 0.0f);
         modelViewMatrix.Rotate(orbitAngularPosition, 0.0f, 0.0f, 1.0f);
         modelViewMatrix.Translate(orbitRadius, 0.0f, 0.0f);
         modelViewMatrix.Rotate(orbitAngularPosition * (-1.0), 0.0f, 0.0f, 1.0f);
@@ -446,6 +503,9 @@ void RenderPlanet(GLTriangleBatch &planetBatch, float inclination, float orbitAn
 
     modelViewMatrix.PopMatrix();
 }
+
+float lastTime = 0.0f;
+float sunRot = 0.0f;
         
 // Called to draw scene
 void RenderScene(void)
@@ -454,13 +514,13 @@ void RenderScene(void)
     static GLfloat vSunColor[] = { 0.94f, 1.0f, 0.17f, 1.0f };
     static GLfloat vEarthColor[] = { 0.17f, 0.54f, 1.0f, 1.0f };
     static GLfloat vMoonColor[] = { 0.8f, 0.8f, 0.8f, 1.0f };
-    static GLfloat vWhite[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     static GLfloat vLightPos[] = { 0.0f, 0.0f, -11.0f, 1.0f };
 
     // Time Based animation
 	static CStopWatch	rotTimer;
-    float sunRot = rotTimer.GetElapsedSeconds() * 35.0f;
+    sunRot += timeStop ? 0.0f : (rotTimer.GetElapsedSeconds() - lastTime) * 35.0f;
+    lastTime = rotTimer.GetElapsedSeconds();
 
     float mercuryOrb = sunRot * (3.5);
     float mercuryRot = sunRot * (-5.0);
@@ -554,21 +614,28 @@ void RenderScene(void)
      *         MERCURY          *
      ****************************/
     
-    RenderPlanet(mercuryBatch, mercuryOrbitInclination, mercuryOrb, mercuryOrbitRadius, mercuryAxialTilt, mercuryRot, uiTextures[1], vWhite);
+    RenderPlanet(mercuryBatch, mercuryOrbitBatch, mercuryOrbitInclination, mercuryOrb, mercuryOrbitRadius, mercuryAxialTilt, mercuryRot, uiTextures[1], vWhite);
 
     /****************************
      *          VENUS           *
      ****************************/
     
-    RenderPlanet(venusBatch, venusOrbitInclination, venusOrb, venusOrbitRadius, venusAxialTilt, venusRot, uiTextures[2], vWhite);
+    RenderPlanet(venusBatch, venusOrbitBatch, venusOrbitInclination, venusOrb, venusOrbitRadius, venusAxialTilt, venusRot, uiTextures[2], vWhite);
 
     /****************************
      *          EARTH           *
      ****************************/
     modelViewMatrix.PushMatrix();
 
+        modelViewMatrix.Rotate(earthOrbitInclination, 0.0f, 0.0f, 1.0f);
+        if(orbitsVisible){
+            glUseProgram(simpleShader);
+            glUniform4fv(locSimpleColor, 1, vWhite);
+            glUniformMatrix4fv(locSimpleMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
+            earthOrbitBatch.Draw();
+        }
+
         modelViewMatrix.Rotate(90.0, 1.0f, 0.0f, 0.0f);
-        modelViewMatrix.Rotate(earthOrbitInclination, 0.0f, 1.0f, 0.0f);
         modelViewMatrix.Rotate(earthOrb, 0.0f, 0.0f, 1.0f);
         modelViewMatrix.Translate(earthOrbitRadius, 0.0f, 0.0f);
         modelViewMatrix.Rotate(earthOrb * (-1.0), 0.0f, 0.0f, 1.0f);
@@ -592,7 +659,16 @@ void RenderScene(void)
         /****************************
          *          MOON            *
          ****************************/
+        modelViewMatrix.Rotate(-90.0, 1.0f, 0.0f, 0.0f);
         modelViewMatrix.Rotate(moonOrbitInclination, 0.0f, 1.0f, 0.0f);
+        if(orbitsVisible){
+            glUseProgram(simpleShader);
+            glUniform4fv(locSimpleColor, 1, vWhite);
+            glUniformMatrix4fv(locSimpleMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
+            moonOrbitBatch.Draw();
+        }
+        modelViewMatrix.Rotate(90.0, 1.0f, 0.0f, 0.0f);
+
         modelViewMatrix.Rotate(moonOrb, 0.0f, 0.0f, 1.0f);
         modelViewMatrix.Translate(moonOrbitRadius, 0.0f, 0.0f);
         modelViewMatrix.Rotate(moonOrb * (-1.0), 0.0f, 0.0f, 1.0f);
@@ -600,6 +676,7 @@ void RenderScene(void)
         modelViewMatrix.Rotate(moonAxialTilt, 0.0f, 1.0f, 0.0f);
         glBindTexture(GL_TEXTURE_2D, uiTextures[4]);
 
+        glUseProgram(solarShader);
         glUniform3fv(locLight, 1, vLightTransformed);
         glUniformMatrix4fv(locMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
         glUniformMatrix4fv(locMV, 1, GL_FALSE, transformPipeline.GetModelViewMatrix());
@@ -613,37 +690,37 @@ void RenderScene(void)
      *          MARS            *
      ****************************/
     
-    RenderPlanet(marsBatch, marsOrbitInclination, marsOrb, marsOrbitRadius, marsAxialTilt, marsRot, uiTextures[5], vWhite);
+    RenderPlanet(marsBatch, marsOrbitBatch, marsOrbitInclination, marsOrb, marsOrbitRadius, marsAxialTilt, marsRot, uiTextures[5], vWhite);
 
     /****************************
      *         JUPITER          *
      ****************************/
     
-    RenderPlanet(jupiterBatch, jupiterOrbitInclination, jupiterOrb, jupiterOrbitRadius, jupiterAxialTilt, jupiterRot, uiTextures[6], vWhite);
+    RenderPlanet(jupiterBatch, jupiterOrbitBatch, jupiterOrbitInclination, jupiterOrb, jupiterOrbitRadius, jupiterAxialTilt, jupiterRot, uiTextures[6], vWhite);
 
     /****************************
      *          SATURN          *
      ****************************/
     
-    RenderPlanet(saturnBatch, saturnOrbitInclination, saturnOrb, saturnOrbitRadius, saturnAxialTilt, saturnRot, uiTextures[7], vWhite, &saturnRingBatch, uiTextures[8]);
+    RenderPlanet(saturnBatch, saturnOrbitBatch, saturnOrbitInclination, saturnOrb, saturnOrbitRadius, saturnAxialTilt, saturnRot, uiTextures[7], vWhite, &saturnRingBatch, uiTextures[8]);
 
     /****************************
      *          URANUS          *
      ****************************/
     
-    RenderPlanet(uranusBatch, uranusOrbitInclination, uranusOrb, uranusOrbitRadius, uranusAxialTilt, uranusRot, uiTextures[9], vWhite, &uranusRingBatch, uiTextures[8]);
+    RenderPlanet(uranusBatch, uranusOrbitBatch, uranusOrbitInclination, uranusOrb, uranusOrbitRadius, uranusAxialTilt, uranusRot, uiTextures[9], vWhite, &uranusRingBatch, uiTextures[8]);
 
     /****************************
      *         NEPTUNE          *
      ****************************/
     
-    RenderPlanet(neptuneBatch, neptuneOrbitInclination, neptuneOrb, neptuneOrbitRadius, neptuneAxialTilt, neptuneRot, uiTextures[10], vWhite);
+    RenderPlanet(neptuneBatch, neptuneOrbitBatch, neptuneOrbitInclination, neptuneOrb, neptuneOrbitRadius, neptuneAxialTilt, neptuneRot, uiTextures[10], vWhite);
 
     /****************************
      *          PLUTO           *
      ****************************/
     
-    RenderPlanet(plutoBatch, plutoOrbitInclination, plutoOrb, plutoOrbitRadius, plutoAxialTilt, plutoRot, uiTextures[11], vWhite);
+    RenderPlanet(plutoBatch, plutoOrbitBatch, plutoOrbitInclination, plutoOrb, plutoOrbitRadius, plutoAxialTilt, plutoRot, uiTextures[11], vWhite);
 
 	// Restore the previous modleview matrix (the identity matrix)
 	// modelViewMatrix.PopMatrix();
@@ -875,3 +952,17 @@ void gltMakeSkyboxBack(GLBatch& cubeBatch, GLfloat fRadius )
 
     cubeBatch.End();
 }   
+
+void gltMakeCircle(GLBatch& circleBatch, GLfloat fRadius, int points )
+{
+    circleBatch.Begin(GL_LINES, points);
+
+    float alpha = 0.0f;
+    for(int i = 0; i < points; i++){
+        circleBatch.Normal3f(0.0f, 1.0f, 0.0f);
+        circleBatch.Vertex3f(fRadius * cos(alpha), 0.0f, fRadius * sin(alpha));
+        alpha += 2.0f * PI / points;
+    }
+
+    circleBatch.End();
+}

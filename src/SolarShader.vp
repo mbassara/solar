@@ -1,7 +1,3 @@
-// Flat Shader
-// Vertex Shader
-// Richard S. Wright Jr.
-// OpenGL SuperBible
 #version 330
 
 // Incoming per vertex

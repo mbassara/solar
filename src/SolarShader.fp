@@ -1,7 +1,3 @@
-// Flat Shader
-// Fragment Shader
-// Richard S. Wright Jr.
-// OpenGL SuperBible
 #version 330
 
 uniform sampler2D colorMap;
@@ -16,5 +12,5 @@ void main(void)
 { 
 	vec4 vTmpColor = texture(colorMap, vVaryingTexCoords.st);
 	vFragColor.rgb = vTmpColor.rgb * lightIntensity;
-	vFragColor.a = lightIntensity;
+	vFragColor.a = 1.0f;
 }
