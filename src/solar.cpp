@@ -31,7 +31,12 @@ GLMatrixStack       projectionMatrix;       // Projection Matrix
 GLFrustum           viewFrustum;            // View Frustum
 GLGeometryTransform transformPipeline;      // Geometry Transform Pipeline
 
-GLBatch     skyBoxBatch;
+GLBatch     skyBoxTop;
+GLBatch     skyBoxBottom;
+GLBatch     skyBoxLeft;
+GLBatch     skyBoxRight;
+GLBatch     skyBoxFront;
+GLBatch     skyBoxBack;
 
 GLTriangleBatch     sunBatch;
 GLTriangleBatch     mercuryBatch;
@@ -55,7 +60,7 @@ M3DVector4f         vLightTransformed;
 M3DMatrix44f        mCamera;
 
 GLuint              uiTextures[12];
-GLuint              skyBoxTexture;
+GLuint              skyBoxTexture[6];
 
 GLuint  solarShader;         // The Solar shader
 GLint   locColor;           // The location of the diffuse color
@@ -117,7 +122,14 @@ const float plutoOrbitInclination = 17.09f;
 const float plutoAxialTilt = -119.591f;
 const float plutoRadius = 0.04f;
 const float plutoOrbitRadius = 9.0f;
-    
+
+
+void gltMakeSkyboxTop(GLBatch& cubeBatch, GLfloat fRadius );
+void gltMakeSkyboxBottom(GLBatch& cubeBatch, GLfloat fRadius );
+void gltMakeSkyboxLeft(GLBatch& cubeBatch, GLfloat fRadius );
+void gltMakeSkyboxRight(GLBatch& cubeBatch, GLfloat fRadius );
+void gltMakeSkyboxFront(GLBatch& cubeBatch, GLfloat fRadius );
+void gltMakeSkyboxBack(GLBatch& cubeBatch, GLfloat fRadius );
     
 bool LoadTGATexture(const char *szFileName, GLenum minFilter, GLenum magFilter, GLenum wrapMode)
 {
@@ -163,7 +175,12 @@ void SetupRC()
     
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    gltMakeCube(skyBoxBatch, 40.0f);
+    gltMakeSkyboxTop(skyBoxTop, 40.0f);
+    gltMakeSkyboxBottom(skyBoxBottom, 40.0f);
+    gltMakeSkyboxLeft(skyBoxLeft, 40.0f);
+    gltMakeSkyboxRight(skyBoxRight, 40.0f);
+    gltMakeSkyboxFront(skyBoxFront, 40.0f);
+    gltMakeSkyboxBack(skyBoxBack, 40.0f);
     
     gltMakeSphere(sunBatch, 0.5f, 40, 20);
     gltMakeSphere(mercuryBatch, mercuryRadius, 16, 8);
@@ -218,10 +235,25 @@ void SetupRC()
     glBindTexture(GL_TEXTURE_2D, uiTextures[11]);
     LoadTGATexture("img/plutomap.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
 
-    glGenTextures(1, &skyBoxTexture);
+    glGenTextures(6, skyBoxTexture);
     
-    glBindTexture(GL_TEXTURE_2D, skyBoxTexture);
-    LoadTGATexture("img/skybox.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[0]);
+    LoadTGATexture("img/skybox/top.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[1]);
+    LoadTGATexture("img/skybox/bottom.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[2]);
+    LoadTGATexture("img/skybox/left.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[3]);
+    LoadTGATexture("img/skybox/right.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[4]);
+    LoadTGATexture("img/skybox/front.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[5]);
+    LoadTGATexture("img/skybox/back.tga", GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT);
 
 
     solarShader = gltLoadShaderPairWithAttributes("src/SolarShader.vp", "src/SolarShader.fp", 3, GLT_ATTRIBUTE_VERTEX, "vVertex",
@@ -237,8 +269,8 @@ void SetupRC()
 // Do shutdown for the rendering context
 void ShutdownRC(void)
 {
-    glDeleteTextures(11, uiTextures);
-    glDeleteTextures(1, &skyBoxTexture);
+    glDeleteTextures(12, uiTextures);
+    glDeleteTextures(6, skyBoxTexture);
 }
 
 
@@ -249,7 +281,7 @@ void ChangeSize(int nWidth, int nHeight)
 	glViewport(0, 0, nWidth, nHeight);
 	
     // Create the projection matrix, and load it on the projection matrix stack
-	viewFrustum.SetPerspective(35.0f, float(nWidth)/float(nHeight), 1.0f, 100.0f);
+	viewFrustum.SetPerspective(35.0f, float(nWidth)/float(nHeight), 0.01f, 160.0f);
 	projectionMatrix.LoadMatrix(viewFrustum.GetProjectionMatrix());
     
     // Set the transformation pipeline to use the two matrix stacks 
@@ -474,13 +506,31 @@ void RenderScene(void)
     
     // Start position
     modelViewMatrix.Translate(0.0f, 0.0f, -11.0f);
+
+    /****************************
+     *          SKYBOX          *
+     ****************************/
         
-    // Draw the skyBox
-    glBindTexture(GL_TEXTURE_2D, skyBoxTexture);
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[0]);
     shaderManager.UseStockShader(GLT_SHADER_TEXTURE_REPLACE,
                                  transformPipeline.GetModelViewProjectionMatrix(),
                                  0);
-    skyBoxBatch.Draw();
+    skyBoxTop.Draw();
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[1]);
+    skyBoxBottom.Draw();
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[2]);
+    skyBoxLeft.Draw();
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[3]);
+    skyBoxRight.Draw();
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[4]);
+    skyBoxFront.Draw();
+    
+    glBindTexture(GL_TEXTURE_2D, skyBoxTexture[5]);
+    skyBoxBack.Draw();
     
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -638,3 +688,190 @@ int main(int argc, char* argv[])
     ShutdownRC();
     return 0;
 }
+
+void gltMakeSkyboxTop(GLBatch& cubeBatch, GLfloat fRadius )
+{
+    cubeBatch.Begin(GL_TRIANGLES, 6, 1);
+            
+    cubeBatch.Normal3f(0.0f, fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, fRadius);
+
+    cubeBatch.End();
+}   
+
+
+void gltMakeSkyboxBottom(GLBatch& cubeBatch, GLfloat fRadius )
+{
+    cubeBatch.Begin(GL_TRIANGLES, 6, 1);
+                
+    cubeBatch.Normal3f(0.0f, -fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, -fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, -fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, -fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, -fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, -fRadius, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, fRadius);
+
+    cubeBatch.End();
+}   
+
+void gltMakeSkyboxLeft(GLBatch& cubeBatch, GLfloat fRadius )
+{
+    cubeBatch.Begin(GL_TRIANGLES, 6, 1);
+
+    cubeBatch.Normal3f(-fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(-fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(-fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(-fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(-fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(-fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, fRadius);
+
+    cubeBatch.End();
+}   
+    
+void gltMakeSkyboxRight(GLBatch& cubeBatch, GLfloat fRadius )
+{
+    cubeBatch.Begin(GL_TRIANGLES, 6, 1);
+            
+    cubeBatch.Normal3f(fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, fRadius);
+    
+    cubeBatch.Normal3f(fRadius, 0.0f, 0.0f);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, -fRadius);
+
+    cubeBatch.End();
+}   
+
+void gltMakeSkyboxFront(GLBatch& cubeBatch, GLfloat fRadius )
+{
+    cubeBatch.Begin(GL_TRIANGLES, 6, 1);
+                
+    cubeBatch.Normal3f(0.0f, 0.0f, fRadius);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, fRadius);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, fRadius);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, fRadius);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, fRadius);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, fRadius);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, fRadius);
+
+    cubeBatch.End();
+}   
+
+void gltMakeSkyboxBack(GLBatch& cubeBatch, GLfloat fRadius )
+{
+    cubeBatch.Begin(GL_TRIANGLES, 6, 1);
+            
+    cubeBatch.Normal3f(0.0f, 0.0f, -fRadius);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, -fRadius);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 0.0f);
+    cubeBatch.Vertex3f(-fRadius, -fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, -fRadius);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, -fRadius);
+    cubeBatch.MultiTexCoord2f(0, 0.0f, 1.0f);
+    cubeBatch.Vertex3f(-fRadius, fRadius, -fRadius);
+    
+    cubeBatch.Normal3f(0.0f, 0.0f, -fRadius);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 1.0f);
+    cubeBatch.Vertex3f(fRadius, fRadius, -fRadius);
+
+    cubeBatch.Normal3f(0.0f, 0.0f, -fRadius);
+    cubeBatch.MultiTexCoord2f(0, 1.0f, 0.0f);
+    cubeBatch.Vertex3f(fRadius, -fRadius, -fRadius);   
+
+    cubeBatch.End();
+}   
