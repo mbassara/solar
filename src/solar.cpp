@@ -81,6 +81,8 @@ GLint   locLight;           // The location of the Light in eye coordinates
 GLint   locMV;              // The location of the ModelView matrix uniform
 GLint   locMVP;             // The location of the ModelViewProjection matrix uniform
 GLint   locNM;              // The location of the Normal matrix uniform
+GLint   locDoubleLayer;     // The location of the double layer flag uniform
+GLint   locObserverLight;     // The location of the observer light uniform
 
 GLuint  simpleShader;       // The Solar shader
 GLint   locSimpleColor;     // The location of the diffuse color
@@ -215,16 +217,16 @@ void SetupRC()
     gltMakeSphere(neptuneBatch, neptuneRadius, 30, 15);
     gltMakeSphere(plutoBatch, plutoRadius, 16, 8);
 
-    gltMakeCircle(mercuryOrbitBatch, mercuryOrbitRadius, 50);
-    gltMakeCircle(venusOrbitBatch, venusOrbitRadius, 50);
-    gltMakeCircle(earthOrbitBatch, earthOrbitRadius, 50);
-    gltMakeCircle(moonOrbitBatch, moonOrbitRadius, 50);
-    gltMakeCircle(marsOrbitBatch, marsOrbitRadius, 50);
-    gltMakeCircle(jupiterOrbitBatch, jupiterOrbitRadius, 50);
-    gltMakeCircle(saturnOrbitBatch, saturnOrbitRadius, 50);
-    gltMakeCircle(uranusOrbitBatch, uranusOrbitRadius, 50);
-    gltMakeCircle(neptuneOrbitBatch, neptuneOrbitRadius, 50);
-    gltMakeCircle(plutoOrbitBatch, plutoOrbitRadius, 50);
+    gltMakeCircle(mercuryOrbitBatch, mercuryOrbitRadius, (int) (mercuryOrbitRadius * 50));
+    gltMakeCircle(venusOrbitBatch, venusOrbitRadius, (int) (venusOrbitRadius * 50));
+    gltMakeCircle(earthOrbitBatch, earthOrbitRadius, (int) (earthOrbitRadius * 50));
+    gltMakeCircle(moonOrbitBatch, moonOrbitRadius, (int) (moonOrbitRadius * 50));
+    gltMakeCircle(marsOrbitBatch, marsOrbitRadius, (int) (marsOrbitRadius * 50));
+    gltMakeCircle(jupiterOrbitBatch, jupiterOrbitRadius, (int) (jupiterOrbitRadius * 50));
+    gltMakeCircle(saturnOrbitBatch, saturnOrbitRadius, (int) (saturnOrbitRadius * 50));
+    gltMakeCircle(uranusOrbitBatch, uranusOrbitRadius, (int) (uranusOrbitRadius * 50));
+    gltMakeCircle(neptuneOrbitBatch, neptuneOrbitRadius, (int) (neptuneOrbitRadius * 50));
+    gltMakeCircle(plutoOrbitBatch, plutoOrbitRadius, (int) (plutoOrbitRadius * 50));
         
     // Make 3 texture objects
     glGenTextures(12, uiTextures);
@@ -293,6 +295,8 @@ void SetupRC()
     locMVP = glGetUniformLocation(solarShader, "mvpMatrix");
     locMV  = glGetUniformLocation(solarShader, "mvMatrix");
     locNM  = glGetUniformLocation(solarShader, "normalMatrix");
+    locDoubleLayer  = glGetUniformLocation(solarShader, "bIsDoubleLayer");
+    locObserverLight  = glGetUniformLocation(solarShader, "bObserverLight");
 
 
     simpleShader = gltLoadShaderPairWithAttributes("src/SimpleShader.vp", "src/SimpleShader.fp", 1, GLT_ATTRIBUTE_VERTEX, "vVertex");
@@ -329,6 +333,7 @@ bool speedBoost = false;
 bool stop = false;
 bool orbitsVisible = false;
 bool timeStop = false;
+bool lightOn = false;
 
 void KeyDown(unsigned char key, int x, int y)
 {
@@ -345,14 +350,17 @@ void KeyDown(unsigned char key, int x, int y)
     else if(key == 32){
         speedBoost = true;
     }
+    else if(key == 's'){
+        timeStop ^= true; // toggle
+    }
     else if(key == 'c'){
         stop = true;
     }
     else if(key == 'v'){
         orbitsVisible = true;
     }
-    else if(key == 's'){
-        timeStop = true;
+    else if(key == 'b'){
+        lightOn = true;
     }
     else if(key == 27){
         exit(0);
@@ -370,8 +378,8 @@ void KeyUp(unsigned char key, int x, int y)
     else if(key == 'v'){
         orbitsVisible = false;
     }
-    else if(key == 's'){
-        timeStop = false;
+    else if(key == 'b'){
+        lightOn = false;
     }
 }
 
@@ -479,6 +487,8 @@ void RenderPlanet(GLTriangleBatch &planetBatch, GLBatch &planetOrbitBatch, float
             static GLfloat vWhite[] = { 1.0f, 1.0f, 1.0f, 1.0f };
             glUseProgram(solarShader);
             glUniform1i(glGetUniformLocation(solarShader, "colorMap"), 0);
+            glUniform1i(locDoubleLayer, GL_FALSE);
+            glUniform1i(locObserverLight, lightOn);
             glUniform3fv(locLight, 1, vLightTransformed);
             glUniformMatrix4fv(locMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
             glUniformMatrix4fv(locMV, 1, GL_FALSE, transformPipeline.GetModelViewMatrix());
@@ -490,13 +500,8 @@ void RenderPlanet(GLTriangleBatch &planetBatch, GLBatch &planetOrbitBatch, float
                     glBindTexture(GL_TEXTURE_2D, ringTexture);
                     glUniform1i(glGetUniformLocation(solarShader, "colorMap"), 0);
                 }
-
-                planetRingBatch->Draw();
-                modelViewMatrix.Translate(0.0f, 0.0f, -0.001f);
-                modelViewMatrix.Rotate(180.0, 0.0f, 1.0f, 0.0f);
-                glUniformMatrix4fv(locMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
-                glUniformMatrix4fv(locMV, 1, GL_FALSE, transformPipeline.GetModelViewMatrix());
-                glUniformMatrix3fv(locNM, 1, GL_FALSE, transformPipeline.GetNormalMatrix());
+                glUniform1i(locObserverLight, lightOn);
+                glUniform1i(locDoubleLayer, GL_TRUE);
                 planetRingBatch->Draw();
             }
         modelViewMatrix.PopMatrix();
@@ -648,6 +653,8 @@ void RenderScene(void)
 
             glUseProgram(solarShader);
             glUniform1i(glGetUniformLocation(solarShader, "colorMap"), 0);
+            glUniform1i(locDoubleLayer, GL_FALSE);
+            glUniform1i(locObserverLight, lightOn);
             glUniform3fv(locLight, 1, vLightTransformed);
             glUniformMatrix4fv(locMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
             glUniformMatrix4fv(locMV, 1, GL_FALSE, transformPipeline.GetModelViewMatrix());
@@ -678,6 +685,8 @@ void RenderScene(void)
 
         glUseProgram(solarShader);
         glUniform3fv(locLight, 1, vLightTransformed);
+        glUniform1i(locDoubleLayer, GL_FALSE);
+        glUniform1i(locObserverLight, lightOn);
         glUniformMatrix4fv(locMVP, 1, GL_FALSE, transformPipeline.GetModelViewProjectionMatrix());
         glUniformMatrix4fv(locMV, 1, GL_FALSE, transformPipeline.GetModelViewMatrix());
         glUniformMatrix3fv(locNM, 1, GL_FALSE, transformPipeline.GetNormalMatrix());

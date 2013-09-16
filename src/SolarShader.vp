@@ -1,7 +1,7 @@
 #version 330
 
 // Incoming per vertex
-in vec4 vVertex;
+in vec4	vVertex;
 in vec3 vNormal;
 in vec2 vTexCoords;
 
@@ -10,6 +10,8 @@ uniform vec3	vLightPosition;
 uniform mat4	mvpMatrix;
 uniform mat4	mvMatrix;
 uniform mat3	normalMatrix;
+uniform bool	bIsDoubleLayer;
+uniform bool	bObserverLight;
 
 // Outs
 smooth out float lightIntensity;
@@ -24,11 +26,22 @@ void main(void)
     vec4 vPosition4 = mvMatrix * vVertex;
     vec3 vPosition3 = vPosition4.xyz / vPosition4.w;
 
+    vec3 vTmpLightPosition = vLightPosition;
+    if(bObserverLight){
+    	vTmpLightPosition = vec3(0.0f, 0.0f, 0.0f);
+    }
+
     // Get vector to light source
-    vec3 vLightDir = normalize(vLightPosition - vPosition3);
+    vec3 vLightDir = normalize(vTmpLightPosition - vPosition3);
 
     // Dot product gives us diffuse intensity
-    lightIntensity = max(0.0, dot(vEyeNormal, vLightDir));
+    float tmpIntensity = dot(vEyeNormal, vLightDir);
+    if(bIsDoubleLayer){
+    	lightIntensity = abs(tmpIntensity);
+    }
+    else {
+    	lightIntensity = max(0.0, tmpIntensity);
+    }
 
 	vVaryingTexCoords = vTexCoords;
 	gl_Position = mvpMatrix * vVertex;
